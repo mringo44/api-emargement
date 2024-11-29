@@ -1,0 +1,24 @@
+{
+  "name": "exemple-npm",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "date-fns": "^4.1.0",
+    "express": "^4.21.1",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.11.4",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "eslint": "^9.12.0",
+    "nodemon": "^3.1.7"
+  }
+}
