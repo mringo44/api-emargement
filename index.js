@@ -1,28 +1,18 @@
-require("dotenv").config();
-console.log(process.env);
+import "dotenv/config";
 
-const express = require("express");
-const fs = require("fs");
-const os = require("os");
-const z = require("zod");
-const mysql2 = require("mysql2/promise");
-const jwt = require("jsonwebtoken");
-const bcrypt = require("bcrypt");
+import express from "express";
+import fs from "fs";
+import z from "zod";
+import jwt from "jsonwebtoken";
+import bcrypt from "bcrypt";
+
+import { connectDb } from "./lib.js";
+import { validateData, logger, checkAuth } from "./middleware.js";
 
 const app = express();
 const currentPath = process.cwd();
-const jwtKey = process.env.JWT_KEY;
 
-let db = null;
-async function connectDb() {
-  db = await mysql2.createConnection({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    database: process.env.DB_DATABASE,
-    password: process.env.DB_PASSWORD,
-  });
-}
-connectDb();
+let db = await connectDb();
 
 app.get("/files", async function (req, res) {
   const directory = await fs.promises.readdir(currentPath);
@@ -114,30 +104,27 @@ const userSchema = z.object({
   password: z.string().min(8),
 });
 
-app.post("/users", express.json(), async (req, res) => {
-  let data;
-  try {
-    data = userSchema.parse(req.body);
-  } catch (error) {
-    res.status(400);
-    res.json({ error: error.errors });
-    return;
-  }
+app.post(
+  "/users",
+  express.json(),
+  validateData(userSchema),
+  async (req, res) => {
+    const data = req.body;
+    try {
+      const hashedPassword = await bcrypt.hash(data.password, 10);
+      const [result] = await db.execute(
+        "INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
+        [data.name, data.email, hashedPassword]
+      );
 
-  try {
-    const hashedPassword = await bcrypt.hash(data.password, 10);
-    const [result] = await db.execute(
-      "INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
-      [data.name, data.email, hashedPassword]
-    );
-
-    res.status(200);
-    res.json({ id: result.insertId, name: data.name, email: data.email });
-  } catch (error) {
-    res.status(500);
-    res.json({ error: error.message });
+      res.status(200);
+      res.json({ id: result.insertId, name: data.name, email: data.email });
+    } catch (error) {
+      res.status(500);
+      res.json({ error: error.message });
+    }
   }
-});
+);
 
 // On attend une requête JSON avec email + password
 const loginSchema = z.object({
@@ -146,70 +133,43 @@ const loginSchema = z.object({
 });
 
 // Route POST /login pour s'authentifier
-app.post("/login", express.json(), async (req, res) => {
-  let data;
-  try {
-    data = loginSchema.parse(req.body);
-  } catch (error) {
-    res.status(400);
-    res.json({ error: error.errors });
-    return;
-  }
+app.post(
+  "/login",
+  express.json(),
+  validateData(loginSchema),
+  async (req, res) => {
+    const data = req.body;
 
-  // On vérifie en base de données si email + password sont OK
-  const [rows] = await db.query(
-    "SELECT id, password FROM users WHERE email = ?",
-    [data.email]
-  );
-
-  if (rows.length === 0) {
-    res.status(401);
-    res.send("Unauthorized");
-    return;
-  }
-
-  const isRightPassword = await bcrypt.compare(data.password, rows[0].password);
-  if (!isRightPassword) {
-    res.status(401);
-    res.send("Unauthorized");
-    return;
-  }
-
-  // Générer un token JWT
-  const payload = { id: rows[0].id };
-  const token = jwt.sign(payload, jwtKey);
-
-  // Renvoyer le token si tout est OK
-  res.json({ token });
-});
-
-async function checkAuth(req, res, next) {
-  const { authorization } = req.headers;
-
-  try {
-    const decoded = jwt.verify(authorization, jwtKey);
+    // On vérifie en base de données si email + password sont OK
     const [rows] = await db.query(
-      "SELECT id, name, email FROM users WHERE id = ?",
-      [decoded.id]
+      "SELECT id, password FROM users WHERE email = ?",
+      [data.email]
     );
 
     if (rows.length === 0) {
-      throw new Error("User not found");
+      res.status(401);
+      res.send("Unauthorized");
+      return;
     }
 
-    req.user = rows[0];
-    return next();
-  } catch (error) {}
+    const isRightPassword = await bcrypt.compare(
+      data.password,
+      rows[0].password
+    );
+    if (!isRightPassword) {
+      res.status(401);
+      res.send("Unauthorized");
+      return;
+    }
 
-  res.status(401);
-  res.send("Unauthorized");
-  return;
-}
+    // Générer un token JWT
+    const payload = { id: rows[0].id };
+    const token = jwt.sign(payload, process.env.JWT_KEY);
 
-function logger(req, res, next) {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-  next();
-}
+    // Renvoyer le token si tout est OK
+    res.json({ token });
+  }
+);
 
 app.get("/me", logger, checkAuth, (req, res) => {
   console.log("Utilisateur authentifié", req.user);
@@ -224,31 +184,3 @@ app.get("/protected", logger, checkAuth, (req, res) => {
 app.listen(8080, () => {
   console.log("Server is running on port 8080");
 });
-
-/*
-
-const id = parseInt(req.params.id);
-
-  const user = users.find((user) => user.id === id);
-
-  if (!user) {
-    res.status(404);
-    res.send("User not found");
-    return;
-  }
-
-  res.json(user);
-
-// Récupérer page et size depuis les query parameters
-  const page = parseInt(req.query.page) || 1;
-  const size = parseInt(req.query.size) || 5;
-
-  const start = (page - 1) * size;
-  const end = start + size;
-
-  const paginatedUsers = users.slice(start, end);
-  res.json({
-    users: paginatedUsers,
-    total: users.length,
-  });
-  */
