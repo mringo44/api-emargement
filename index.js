@@ -1,3 +1,6 @@
+require("dotenv").config();
+console.log(process.env);
+
 const express = require("express");
 const fs = require("fs");
 const os = require("os");
@@ -8,16 +11,15 @@ const bcrypt = require("bcrypt");
 
 const app = express();
 const currentPath = process.cwd();
-const jwtKey =
-  "310b12b065a697b433ca578b74b64d394e9f0f8a3432ed7c5a59628f9baac6bee347ef65a3a85e3c0d530c2c5c0dc261ade2657718ed11816cffd09866051234b0d1f0410af13736d23be2e525ec3dab3549437fe009f0e0e108869e9673cccef23613947afbfe5523bc6b0961148f2059e44fd692d8dd43674bd7610758279f96f2cfcb93a3e7fc5d977612df25cff38ebe00c1f79f155dc2d37c3e5f8830a863722d4b06f48ae82d64207833b843363f459d2752418f427709fff59264c638743bce45c715cad30c539346bd8c7f7288b3ac5ce80dc52389999615f512a30a8a414d6619ba8861d3315d2476aa8d5443254b26db72a6815ebe74b24dd5fe3a";
+const jwtKey = process.env.JWT_KEY;
 
 let db = null;
 async function connectDb() {
   db = await mysql2.createConnection({
-    host: "localhost",
-    user: "admin",
-    database: "api",
-    password: "Passw0rd",
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    database: process.env.DB_DATABASE,
+    password: process.env.DB_PASSWORD,
   });
 }
 connectDb();
