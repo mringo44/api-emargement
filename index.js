@@ -91,6 +91,106 @@ app.post(
 
 // ---------------------------------Gestion des sessions de cours----------------------------------
 
+const sessionSchema = z.object({
+  title: z.string().min(5)
+});
+
+// Route POST /sessions pour ajouter une session
+app.post(
+  "/sessions",
+  express.json(),
+  checkAuth,
+  validateData(sessionSchema),
+  async (req, res) => {
+    const data = req.body;
+    try {
+      const [result] = await db.execute(
+        "INSERT INTO Session (title, date, formateur_id) VALUES (?, ?, ?)",
+        [data.title, data.date, data.formateur_id]
+      );
+
+      res.status(200);
+      res.json({ id: result.insertId, title: data.title, date: data.date, formateur_id: data.formateur_id });
+    } catch (error) {
+      res.status(500);
+      res.json({ error: error.message });
+    }
+  }
+);
+
+// Route GET /sessions pour voir toutes les sessions
+app.get("/sessions", async (req, res) => {
+  const page = parseInt(req.query.page || "1");
+  console.log("page", page);
+
+  // Validation du paramètre "page"
+  if (Number.isNaN(page)) {
+    res.status(400);
+    res.send('Invalid query parameter "page"');
+    return;
+  }
+
+  const size = parseInt(req.query.size || "5");
+  console.log("size", size);
+
+  // Validation du paramètre "size"
+  if (Number.isNaN(size)) {
+    res.status(400);
+    res.send('Invalid query parameter "size"');
+    return;
+  }
+
+  const start = (page - 1) * size;
+
+  const [rows] = await db.query(
+    "SELECT title, date, formateur_id FROM Session LIMIT ?, ?",
+    [start, size]
+  );
+
+  res.json(rows);
+});
+
+// Route GET /sessions/:id pour voir une session en particulier
+// (\\d+) : contrainte pour un id en décimal uniquement
+app.get("/sessions/:id(\\d+)", async (req, res) => {
+  const id = parseInt(req.params.id);
+  const [rows] = await db.query(
+    "SELECT title, date, formateur_id FROM Session WHERE id = ?",
+    [id]
+  );
+
+  if (rows.length === 0) {
+    res.status(404);
+    res.send("Session not found");
+    return;
+  }
+
+  res.json(rows[0]);
+});
+
+// Route PUT /sessions/id: pour modifier une session
+app.put(
+  "/sessions/:id(\\d+)",
+  express.json(),
+  checkAuth,
+  validateData(sessionSchema),
+  async (req, res) => {
+    const id = parseInt(req.params.id);
+    const data = req.body;
+    try {
+      const [result] = await db.execute(
+        "INSERT INTO Session (title, date, formateur_id) VALUES (?, ?, ?)",
+        [data.title, data.date, data.formateur_id]
+      );
+
+      res.status(200);
+      res.json({ id: result.insertId, title: data.title, date: data.date, formateur_id: data.formateur_id });
+    } catch (error) {
+      res.status(500);
+      res.json({ error: error.message });
+    }
+  }
+);
 
 // ------------------------------------------------------------------------------------------------
 app.get("/files", async function (req, res) {
@@ -125,78 +225,6 @@ app.get("/print-headers", (req, res) => {
   res.header("App-Version", "1.0");
   res.send("OK");
 });
-
-// Exemple requête paginée
-// http://localhost:8080/users?page=3&size=2
-app.get("/users", async (req, res) => {
-  const page = parseInt(req.query.page || "1");
-  console.log("page", page);
-
-  if (Number.isNaN(page)) {
-    res.status(400);
-    res.send('Invalid query parameter "page"');
-    return;
-  }
-
-  const size = parseInt(req.query.size || "5");
-  console.log("size", size);
-
-  if (Number.isNaN(size)) {
-    res.status(400);
-    res.send('Invalid query parameter "size"');
-    return;
-  }
-
-  const start = (page - 1) * size;
-
-  const [rows] = await db.query(
-    "SELECT id, name, email FROM users LIMIT ?, ?",
-    [start, size]
-  );
-
-  res.json(rows);
-});
-
-// Créer une route /users/:id qui renvoie uniquement l'utilisateur avec l'id correspondant
-// Renvoyer un code 404 si l'utilisateur n'existe pas
-app.get("/users/:id(\\d+)", async (req, res) => {
-  const id = parseInt(req.params.id);
-  const [rows] = await db.query(
-    "SELECT id, name, email FROM users WHERE id = ?",
-    [id]
-  );
-
-  if (rows.length === 0) {
-    res.status(404);
-    res.send("User not found");
-    return;
-  }
-
-  res.json(rows[0]);
-});
-
-
-// Route POST /auth/signup pour ajouter un utilisateur
-app.post(
-  "/sessions",
-  express.json(),
-  validateData(userSchema),
-  async (req, res) => {
-    const data = req.body;
-    try {
-      const [result] = await db.execute(
-        "INSERT INTO Session (title, date, formateur_id) VALUES (?, ?, ?)",
-        [data.title, data.date, data.formateur_id]
-      );
-
-      res.status(200);
-      res.json({ id: result.insertId, title: data.title, date: data.date, formateur_id: data.formateur_id });
-    } catch (error) {
-      res.status(500);
-      res.json({ error: error.message });
-    }
-  }
-);
 
 app.get("/me", logger, checkAuth, (req, res) => {
   console.log("Utilisateur authentifié", req.user);
