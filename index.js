@@ -57,19 +57,6 @@ app.get("/print-headers", (req, res) => {
   res.send("OK");
 });
 
-const users = [
-  { id: 1, name: "John", email: "john@example.com" },
-  { id: 2, name: "Jane", email: "jane@example.com" },
-  { id: 3, name: "Bob", email: "bob@example.com" },
-  { id: 4, name: "Alice", email: "alice@example.com" },
-  { id: 5, name: "Kate", email: "kate@example.com" },
-  { id: 6, name: "Doe", email: "doe@example.com" },
-  { id: 7, name: "Smith", email: "smith@example.com" },
-  { id: 8, name: "Tom", email: "tom@example.com" },
-  { id: 9, name: "Jerry", email: "jerry@example.com" },
-  { id: 10, name: "Mike", email: "mike@example.com" },
-];
-
 // Exemple requête paginée
 // http://localhost:8080/users?page=3&size=2
 app.get("/users", async (req, res) => {
@@ -138,9 +125,10 @@ app.post("/users", express.json(), async (req, res) => {
   }
 
   try {
+    const hashedPassword = await bcrypt.hash(data.password, 10);
     const [result] = await db.execute(
       "INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
-      [data.name, data.email, data.password]
+      [data.name, data.email, hashedPassword]
     );
 
     res.status(200);
@@ -170,8 +158,8 @@ app.post("/login", express.json(), async (req, res) => {
 
   // On vérifie en base de données si email + password sont OK
   const [rows] = await db.query(
-    "SELECT id FROM users WHERE email = ? AND password = ?",
-    [data.email, data.password]
+    "SELECT id, password FROM users WHERE email = ?",
+    [data.email]
   );
 
   if (rows.length === 0) {
@@ -180,8 +168,15 @@ app.post("/login", express.json(), async (req, res) => {
     return;
   }
 
+  const isRightPassword = await bcrypt.compare(data.password, rows[0].password);
+  if (!isRightPassword) {
+    res.status(401);
+    res.send("Unauthorized");
+    return;
+  }
+
   // Générer un token JWT
-  const payload = rows[0];
+  const payload = { id: rows[0].id };
   const token = jwt.sign(payload, jwtKey);
 
   // Renvoyer le token si tout est OK
