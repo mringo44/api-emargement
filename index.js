@@ -14,6 +14,85 @@ const currentPath = process.cwd();
 
 let db = await connectDb();
 
+// --------------------------Gestion des utilisateurs----------------------------
+
+const userSchema = z.object({
+  name: z.string().min(2),
+  email: z.string().email(),
+  password: z.string().min(8)
+});
+
+// Route POST /auth/signup pour ajouter un utilisateur
+app.post(
+  "/auth/signup",
+  express.json(),
+  validateData(userSchema),
+  async (req, res) => {
+    const data = req.body;
+    try {
+      const hashedPassword = await bcrypt.hash(data.password, 10);
+      const [result] = await db.execute(
+        "INSERT INTO Utilisateur (name, email, password, role) VALUES (?, ?, ?, ?)",
+        [data.name, data.email, hashedPassword, data.role]
+      );
+
+      res.status(200);
+      res.json({ id: result.insertId, name: data.name, email: data.email });
+    } catch (error) {
+      res.status(500);
+      res.json({ error: error.message });
+    }
+  }
+);
+
+const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+});
+
+// Route POST /auth/login pour s'authentifier
+app.post(
+  "/auth/login",
+  express.json(),
+  validateData(loginSchema),
+  async (req, res) => {
+    const data = req.body;
+
+    // On vérifie en base de données si email + password sont OK
+    const [rows] = await db.query(
+      "SELECT id, password FROM users WHERE email = ?",
+      [data.email]
+    );
+
+    if (rows.length === 0) {
+      res.status(401);
+      res.send("Unauthorized");
+      return;
+    }
+
+    const isRightPassword = await bcrypt.compare(
+      data.password,
+      rows[0].password
+    );
+    if (!isRightPassword) {
+      res.status(401);
+      res.send("Unauthorized");
+      return;
+    }
+
+    // Générer un token JWT
+    const payload = { id: rows[0].id };
+    const token = jwt.sign(payload, process.env.JWT_KEY);
+
+    // Renvoyer le token si tout est OK
+    res.json({ token });
+  }
+);
+
+// ---------------------------------Gestion des sessions de cours----------------------------------
+
+
+// ------------------------------------------------------------------------------------------------
 app.get("/files", async function (req, res) {
   const directory = await fs.promises.readdir(currentPath);
 
@@ -96,78 +175,26 @@ app.get("/users/:id(\\d+)", async (req, res) => {
   res.json(rows[0]);
 });
 
-// Créer une route POST /users qui permet d'ajouter un utilisateur avec les informations fournies
-// au format JSON : name et email --
-const userSchema = z.object({
-  name: z.string().min(2),
-  email: z.string().email(),
-  password: z.string().min(8),
-});
 
+// Route POST /auth/signup pour ajouter un utilisateur
 app.post(
-  "/users",
+  "/sessions",
   express.json(),
   validateData(userSchema),
   async (req, res) => {
     const data = req.body;
     try {
-      const hashedPassword = await bcrypt.hash(data.password, 10);
       const [result] = await db.execute(
-        "INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
-        [data.name, data.email, hashedPassword]
+        "INSERT INTO Session (title, date, formateur_id) VALUES (?, ?, ?)",
+        [data.title, data.date, data.formateur_id]
       );
 
       res.status(200);
-      res.json({ id: result.insertId, name: data.name, email: data.email });
+      res.json({ id: result.insertId, title: data.title, date: data.date, formateur_id: data.formateur_id });
     } catch (error) {
       res.status(500);
       res.json({ error: error.message });
     }
-  }
-);
-
-// On attend une requête JSON avec email + password
-const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-});
-
-// Route POST /login pour s'authentifier
-app.post(
-  "/login",
-  express.json(),
-  validateData(loginSchema),
-  async (req, res) => {
-    const data = req.body;
-
-    // On vérifie en base de données si email + password sont OK
-    const [rows] = await db.query(
-      "SELECT id, password FROM users WHERE email = ?",
-      [data.email]
-    );
-
-    if (rows.length === 0) {
-      res.status(401);
-      res.send("Unauthorized");
-      return;
-    }
-
-    const isRightPassword = await bcrypt.compare(
-      data.password,
-      rows[0].password
-    );
-    if (!isRightPassword) {
-      res.status(401);
-      res.send("Unauthorized");
-      return;
-    }
-
-    // Générer un token JWT
-    const payload = { id: rows[0].id };
-    const token = jwt.sign(payload, process.env.JWT_KEY);
-
-    // Renvoyer le token si tout est OK
-    res.json({ token });
   }
 );
 

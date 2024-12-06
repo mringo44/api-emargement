@@ -27,7 +27,7 @@ async function checkAuth(req, res, next) {
     const decoded = jwt.verify(authorization, process.env.JWT_KEY);
     const db = await connectDb();
     const [rows] = await db.query(
-      "SELECT id, name, email FROM users WHERE id = ?",
+      "SELECT id, name, email FROM Utilisateur WHERE id = ?",
       [decoded.id]
     );
 
