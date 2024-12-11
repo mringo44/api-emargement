@@ -15,6 +15,7 @@ function validateData(schema) {
   };
 }
 
+// Vérification des autorisations nécessaires pour effectuer une action en tant que formateur
 async function checkAuthForm(req, res, next) {
   const { authorization } = req.headers;
 
@@ -41,6 +42,7 @@ async function checkAuthForm(req, res, next) {
   return;
 }
 
+// Vérification des autorisations nécessaires pour effectuer une action en tant qu'étudiant
 async function checkAuthStud(req, res, next) {
   const { authorization } = req.headers;
 

@@ -156,7 +156,7 @@ app.put("/sessions/:id(\\d+)",
       );
 
       res.status(200);
-      res.json({ id: result.insertId, title: data.title, date: data.date, formateur_id: data.formateur_id });
+      res.json({ title: data.title, date: data.date, formateur_id: data.formateur_id });
     } catch (error) {
       res.status(500);
       res.json({ error: error.message });
@@ -165,7 +165,9 @@ app.put("/sessions/:id(\\d+)",
 );
 
 // Route DELETE /sessions/:id pour supprimer une session en particulier
-app.delete("/sessions/:id(\\d+)", async (req, res) => {
+app.delete("/sessions/:id(\\d+)",
+  checkAuthForm,
+  async (req, res) => {
   const id = parseInt(req.params.id);
   const [rows] = await db.query(
     "DELETE FROM Session WHERE id = ?",
@@ -184,7 +186,7 @@ app.delete("/sessions/:id(\\d+)", async (req, res) => {
 // ------------------------------------Gestion des émargements-------------------------------------
 
 // Route POST /sessions/:id/emargement pour émarger à une session
-app.post("/sessions/:id/emargement",
+app.post("/sessions/:id(\\d+)/emargement",
   express.json(),
   checkAuthStud,
   async (req, res) => {
@@ -197,7 +199,7 @@ app.post("/sessions/:id/emargement",
       );
 
       res.status(200);
-      res.json({ id: result.insertId, session_id: data.session_id, etudiant_id: data.etudiant_id, status: data.status });
+      res.json({ id: result.insertId, session_id: data.session_id, etudiant_id: data.etudiant_id, status: result.status });
     } catch (error) {
       res.status(500);
       res.json({ error: error.message });
