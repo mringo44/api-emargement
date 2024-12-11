@@ -1,6 +1,7 @@
 import { connectDb } from "./lib.js";
 import jwt from "jsonwebtoken";
 
+// Vérification des conditions fixées avec zod
 function validateData(schema) {
   return (req, res, next) => {
     try {

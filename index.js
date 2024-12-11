@@ -1,9 +1,9 @@
 import "dotenv/config";
 
 import express from "express";
-import z from "zod";
-import jwt from "jsonwebtoken";
-import bcrypt from "bcrypt";
+import z from "zod"; // Permet de valider les données en entrée par le biais de schéma de données
+import jwt from "jsonwebtoken"; // Permet de générer des tokens
+import bcrypt from "bcrypt"; // Permet de crypter un mot de passe par un protocole de hash ou autre
 
 import { connectDb } from "./lib.js";
 import { validateData, checkAuthForm, checkAuthStud } from "./middleware.js";
@@ -14,16 +14,17 @@ let db = await connectDb();
 
 // --------------------------Gestion des utilisateurs----------------------------
 
+// Schéma de données pour l'inscription
 const userSchema = z.object({
-  name: z.string().min(2),
-  email: z.string().email(),
+  name: z.string().min(2), // minimum 2 caractères
+  email: z.string().email(), // format email
   password: z.string().min(8)
 });
 
 // Route POST /auth/signup pour ajouter un utilisateur
 app.post("/auth/signup",
   express.json(),
-  validateData(userSchema),
+  validateData(userSchema), // validation du schéma de données en entrée
   async (req, res) => {
     const data = req.body;
     try {
@@ -42,6 +43,7 @@ app.post("/auth/signup",
   }
 );
 
+// Schéma de données pour la connexion
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
@@ -87,6 +89,7 @@ app.post("/auth/login",
 
 // ---------------------------------Gestion des sessions de cours----------------------------------
 
+// Schéma de données pour la création d'une session
 const sessionSchema = z.object({
   title: z.string().min(5)
 });
