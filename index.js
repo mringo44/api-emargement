@@ -192,6 +192,23 @@ app.put(
   }
 );
 
+// Route DELETE /sessions/:id pour supprimer une session en particulier
+app.delete("/sessions/:id(\\d+)", async (req, res) => {
+  const id = parseInt(req.params.id);
+  const [rows] = await db.query(
+    "DELETE FROM Session WHERE id = ?",
+    [id]
+  );
+
+  if (rows.length === 0) {
+    res.status(404);
+    res.send("Session not found");
+    return;
+  }
+
+  res.send("Session deleted");
+});
+
 // ------------------------------------------------------------------------------------------------
 app.get("/files", async function (req, res) {
   const directory = await fs.promises.readdir(currentPath);
