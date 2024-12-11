@@ -1,16 +1,14 @@
 import "dotenv/config";
 
 import express from "express";
-import fs from "fs";
 import z from "zod";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 
 import { connectDb } from "./lib.js";
-import { validateData, logger, checkAuth } from "./middleware.js";
+import { validateData, checkAuthForm, checkAuthStud } from "./middleware.js";
 
 const app = express();
-const currentPath = process.cwd();
 
 let db = await connectDb();
 
@@ -23,8 +21,7 @@ const userSchema = z.object({
 });
 
 // Route POST /auth/signup pour ajouter un utilisateur
-app.post(
-  "/auth/signup",
+app.post("/auth/signup",
   express.json(),
   validateData(userSchema),
   async (req, res) => {
@@ -51,8 +48,7 @@ const loginSchema = z.object({
 });
 
 // Route POST /auth/login pour s'authentifier
-app.post(
-  "/auth/login",
+app.post("/auth/login",
   express.json(),
   validateData(loginSchema),
   async (req, res) => {
@@ -81,7 +77,7 @@ app.post(
     }
 
     // Générer un token JWT
-    const payload = { id: rows[0].id };
+    const payload = { id: rows[0].id, role: rows[0].role };
     const token = jwt.sign(payload, process.env.JWT_KEY);
 
     // Renvoyer le token si tout est OK
@@ -96,10 +92,9 @@ const sessionSchema = z.object({
 });
 
 // Route POST /sessions pour ajouter une session
-app.post(
-  "/sessions",
+app.post("/sessions",
   express.json(),
-  checkAuth,
+  checkAuthForm,
   validateData(sessionSchema),
   async (req, res) => {
     const data = req.body;
@@ -120,31 +115,9 @@ app.post(
 
 // Route GET /sessions pour voir toutes les sessions
 app.get("/sessions", async (req, res) => {
-  const page = parseInt(req.query.page || "1");
-  console.log("page", page);
-
-  // Validation du paramètre "page"
-  if (Number.isNaN(page)) {
-    res.status(400);
-    res.send('Invalid query parameter "page"');
-    return;
-  }
-
-  const size = parseInt(req.query.size || "5");
-  console.log("size", size);
-
-  // Validation du paramètre "size"
-  if (Number.isNaN(size)) {
-    res.status(400);
-    res.send('Invalid query parameter "size"');
-    return;
-  }
-
-  const start = (page - 1) * size;
 
   const [rows] = await db.query(
-    "SELECT title, date, formateur_id FROM Session LIMIT ?, ?",
-    [start, size]
+    "SELECT title, date, formateur_id FROM Session"
   );
 
   res.json(rows);
@@ -169,10 +142,9 @@ app.get("/sessions/:id(\\d+)", async (req, res) => {
 });
 
 // Route PUT /sessions/id: pour modifier une session
-app.put(
-  "/sessions/:id(\\d+)",
+app.put("/sessions/:id(\\d+)",
   express.json(),
-  checkAuth,
+  checkAuthForm,
   validateData(sessionSchema),
   async (req, res) => {
     const id = parseInt(req.params.id);
@@ -209,49 +181,43 @@ app.delete("/sessions/:id(\\d+)", async (req, res) => {
   res.send("Session deleted");
 });
 
-// ------------------------------------------------------------------------------------------------
-app.get("/files", async function (req, res) {
-  const directory = await fs.promises.readdir(currentPath);
+// ------------------------------------Gestion des émargements-------------------------------------
 
-  const files = [];
-  for (const element of directory) {
-    const stats = await fs.promises.stat(`${currentPath}/${element}`);
+// Route POST /sessions/:id/emargement pour émarger à une session
+app.post("/sessions/:id/emargement",
+  express.json(),
+  checkAuthStud,
+  async (req, res) => {
+    const id = parseInt(req.params.id);
+    const data = req.body;
+    try {
+      const [result] = await db.execute(
+        "INSERT INTO Emargement (session_id, etudiant_id, status) VALUES (?, ?, True)",
+        [id, data.etudiant_id]
+      );
 
-    if (stats.isFile()) {
-      files.push({
-        name: element,
-        size: stats.size,
-        lastUpdate: `${stats.mtime.toLocaleDateString()} ${stats.mtime.toLocaleTimeString()}`,
-      });
+      res.status(200);
+      res.json({ id: result.insertId, session_id: data.session_id, etudiant_id: data.etudiant_id, status: data.status });
+    } catch (error) {
+      res.status(500);
+      res.json({ error: error.message });
     }
   }
+);
 
-  res.send(files);
+// Route GET /sessions/:id/emargement pour voir tous les élèves présents à une session
+app.get("/sessions/:id/emargement",
+  checkAuthForm,
+  async (req, res) => {
+
+  const [rows] = await db.query(
+    "SELECT u.name FROM Utilisateur u INNER JOIN Emargement e ON u.id = e.etudiant_id"
+  );
+
+  res.json(rows);
 });
 
-app.get("/today", (req, res) => {
-  const today = new Date();
-  const dateString = today.toLocaleDateString();
-  const timeString = today.toLocaleTimeString();
-  res.send(`${dateString} ${timeString}`);
-});
-
-app.get("/print-headers", (req, res) => {
-  const { headers } = req;
-  console.log(headers);
-  res.header("App-Version", "1.0");
-  res.send("OK");
-});
-
-app.get("/me", logger, checkAuth, (req, res) => {
-  console.log("Utilisateur authentifié", req.user);
-  res.json(req.user);
-});
-
-// Route GET /protected pour tester le token
-app.get("/protected", logger, checkAuth, (req, res) => {
-  res.send("OK");
-});
+// ------------------------------------------------------------------------------------------------
 
 app.listen(8080, () => {
   console.log("Server is running on port 8080");

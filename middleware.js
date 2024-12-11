@@ -15,12 +15,7 @@ function validateData(schema) {
   };
 }
 
-function logger(req, res, next) {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-  next();
-}
-
-async function checkAuth(req, res, next) {
+async function checkAuthForm(req, res, next) {
   const { authorization } = req.headers;
 
   try {
@@ -46,4 +41,30 @@ async function checkAuth(req, res, next) {
   return;
 }
 
-export { validateData, logger, checkAuth };
+async function checkAuthStud(req, res, next) {
+  const { authorization } = req.headers;
+
+  try {
+    const decoded = jwt.verify(authorization, process.env.JWT_KEY);
+    const db = await connectDb();
+    const [rows] = await db.query(
+      "SELECT id, name, email FROM Utilisateur WHERE id = ? AND role = 'etudiant'",
+      [decoded.id]
+    );
+
+    if (rows.length === 0) {
+      throw new Error("User not found");
+    }
+
+    req.user = rows[0];
+    return next();
+  } catch (error) {
+    console.error(error);
+  }
+
+  res.status(401);
+  res.send("Unauthorized");
+  return;
+}
+
+export { validateData, checkAuthForm,  checkAuthStud };
