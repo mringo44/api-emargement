@@ -128,7 +128,7 @@ app.get("/sessions", async (req, res) => {
 app.get("/sessions/:id(\\d+)", async (req, res) => {
   const id = parseInt(req.params.id);
   const [rows] = await db.query(
-    "SELECT title, date, formateur_id FROM Session WHERE id = ?",
+    "SELECT s.title, s.date, u.name FROM Session s LEFT JOIN Utilisateur u ON s.id = u.id WHERE s.id = ?",
     [id]
   );
 
