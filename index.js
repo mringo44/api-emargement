@@ -57,10 +57,10 @@ app.post(
   validateData(loginSchema),
   async (req, res) => {
     const data = req.body;
-
+    
     // On vérifie en base de données si email + password sont OK
     const [rows] = await db.query(
-      "SELECT id, password FROM users WHERE email = ?",
+      "SELECT id, password FROM Utilisateur WHERE email = ?",
       [data.email]
     );
 
@@ -179,8 +179,8 @@ app.put(
     const data = req.body;
     try {
       const [result] = await db.execute(
-        "INSERT INTO Session (title, date, formateur_id) VALUES (?, ?, ?)",
-        [data.title, data.date, data.formateur_id]
+        "UPDATE Session SET title = ?, date = ?, formateur_id = ? WHERE id = ?",
+        [data.title, data.date, data.formateur_id, id]
       );
 
       res.status(200);
